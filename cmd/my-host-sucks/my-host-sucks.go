@@ -15,8 +15,10 @@ package main
 //   a. Run [1b..1d] and 1f using the local cPanel UAPI.
 
 import (
+	"crypto/tls"
 	"flag"
 	"log"
+	"net/http"
 
 	"github.com/letsdebug/my-host-sucks/cpanel"
 )
@@ -42,16 +44,16 @@ func main() {
 	if cpanel.IsLocal() {
 		state.api = cpanel.NewLocalAPI()
 	} else {
-		api, err := cpanel.NewRemoteAPI(state.CpanelURL, state.CpanelUsername, state.CpanelPassword, state.CpanelInsecure)
+		api, err := cpanel.NewRemoteAPI(state.CpanelURL, state.CpanelUsername, state.CpanelPassword, makeHTTPClient())
 		if err != nil {
-			log.Fatalf("Couldn't create remote cPanel API client: %v. Make sure details are correct.", err)
+			log.Fatalf("Couldn't create remote cPanel API client: %v. Make sure the details are correct.", err)
 		}
 		state.api = api
 	}
 
 	// Make sure we can talk to cPanel
 	if err := testCpanel(); err != nil {
-		log.Fatalf("Connection to cPanel API failed: %v. Make sure details are correct.", err)
+		log.Fatalf("cPanel credentials did not work: %v. Make sure the details are correct.", err)
 		return
 	}
 }
@@ -61,4 +63,17 @@ func testCpanel() error {
 		return err
 	}
 	return nil
+}
+
+func makeHTTPClient() *http.Client {
+	if state.CpanelInsecure {
+		return &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+	}
+	return http.DefaultClient
 }

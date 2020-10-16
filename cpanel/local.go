@@ -31,10 +31,10 @@ func NewLocalAPI() API {
 type localCpanel struct {
 }
 
-func (c *localCpanel) execAndUnmarshal(binary, module, function string, args map[string]string, out interface{}) error {
+func (c *localCpanel) execAndUnmarshal(binary, module, function string, args Args, out interface{}) error {
 	encodedArgs := []string{"--output=json", module, function}
 	for k, v := range args {
-		encodedArgs = append(encodedArgs, k+"="+url.QueryEscape(v))
+		encodedArgs = append(encodedArgs, k+"="+url.QueryEscape(fmt.Sprintf("%v", v)))
 	}
 
 	buf, err := exec.Command(binary, encodedArgs...).Output()
@@ -45,10 +45,10 @@ func (c *localCpanel) execAndUnmarshal(binary, module, function string, args map
 	return json.Unmarshal(buf, out)
 }
 
-func (c *localCpanel) UAPI(module, function string, args map[string]string, out interface{}) error {
+func (c *localCpanel) UAPI(module, function string, args Args, out interface{}) error {
 	return c.execAndUnmarshal(uapiPath, module, function, args, out)
 }
 
-func (c *localCpanel) API2(module, function string, args map[string]string, out interface{}) error {
+func (c *localCpanel) API2(module, function string, args Args, out interface{}) error {
 	return c.execAndUnmarshal(api2Path, module, function, args, out)
 }
