@@ -20,8 +20,13 @@ const (
 // Args is a map container for arguments to the cPanel APIs
 type Args map[string]interface{}
 
+// Client implements a cPanel API client
+type Client struct {
+	a api
+}
+
 // API provides the basic cPanel API primitive operations
-type API interface {
+type api interface {
 	UAPI(ctx context.Context, module, function string, args Args, out interface{}) error
 	API2(ctx context.Context, module, function string, args Args, out interface{}) error
 }

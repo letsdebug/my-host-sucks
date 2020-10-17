@@ -21,9 +21,9 @@ func IsLocal() bool {
 	return s != nil && os.Getuid() != 0
 }
 
-// NewLocalAPI provides an API client for the local environment
-func NewLocalAPI() API {
-	return &localCpanel{}
+// NewLocalClient provides an API client for the local environment
+func NewLocalClient() *Client {
+	return &Client{a: &localCpanel{}}
 }
 
 type localCpanel struct {

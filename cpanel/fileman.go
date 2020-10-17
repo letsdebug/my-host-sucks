@@ -8,9 +8,9 @@ type MkdirResponse struct {
 }
 
 // Mkdir invokes Fileman:mkdir
-func Mkdir(ctx context.Context, api API, path, name, permissions string) (*MkdirResponse, error) {
+func (c *Client) Mkdir(ctx context.Context, path, name, permissions string) (*MkdirResponse, error) {
 	resp := &MkdirResponse{}
-	if err := api.API2(ctx, "Fileman", "mkdir", Args{
+	if err := c.a.API2(ctx, "Fileman", "mkdir", Args{
 		"path":        path,
 		"name":        name,
 		"permissions": permissions,

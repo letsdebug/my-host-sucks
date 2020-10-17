@@ -11,8 +11,8 @@ import (
 	"net/url"
 )
 
-// NewRemoteAPI provides an API client for a remote cPanel environment
-func NewRemoteAPI(cpURL, username, password string, cl *http.Client) (API, error) {
+// NewRemoteClient provides an API client for a remote cPanel environment
+func NewRemoteClient(cpURL, username, password string, cl *http.Client) (*Client, error) {
 	if cpURL == "" || username == "" || password == "" {
 		return nil, errors.New("not all required details (URL, username, password) were provided")
 	}
@@ -21,12 +21,12 @@ func NewRemoteAPI(cpURL, username, password string, cl *http.Client) (API, error
 		return nil, fmt.Errorf("'%s' is not a URL", cpURL)
 	}
 
-	return &remoteCpanel{
+	return &Client{a: &remoteCpanel{
 		URL:      u,
 		Username: username,
 		Password: password,
 		cl:       cl,
-	}, nil
+	}}, nil
 }
 
 type remoteCpanel struct {

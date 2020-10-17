@@ -40,9 +40,9 @@ func (sa *ServerAliases) UnmarshalJSON(buf []byte) error {
 }
 
 // DomainsData invokes DomainInfo:domains_data
-func DomainsData(ctx context.Context, api API) (*DomainsDataResponse, error) {
+func (c *Client) DomainsData(ctx context.Context) (*DomainsDataResponse, error) {
 	var resp DomainsDataResponse
-	if err := api.UAPI(ctx, "DomainInfo", "domains_data", nil, &resp); err != nil {
+	if err := c.a.UAPI(ctx, "DomainInfo", "domains_data", nil, &resp); err != nil {
 		return &resp, err
 	}
 	return &resp, resp.Error()

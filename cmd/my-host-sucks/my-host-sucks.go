@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -26,8 +27,8 @@ import (
 )
 
 var (
-	api    cpanel.API
-	apiCtx context.Context = context.Background()
+	cpanelClient *cpanel.Client
+	cpanelCtx    context.Context = context.Background()
 )
 
 func main() {
@@ -46,27 +47,39 @@ func main() {
 
 	// Choose cPanel API client based on environment
 	if cpanel.IsLocal() {
-		api = cpanel.NewLocalAPI()
-	} else if api, err = cpanel.NewRemoteAPI(cpURL, cpUser, cpPassword, makeHTTPClient(cpInsecure)); err != nil {
-		log.Fatalf("Couldn't create remote cPanel API client: %v. Make sure the details are correct.", err)
+		cpanelClient = cpanel.NewLocalClient()
+	} else if cpanelClient, err = cpanel.NewRemoteClient(
+		cpURL, cpUser, cpPassword, makeHTTPClient(cpInsecure)); err != nil {
+		log.Fatalf("Couldn't create remote cPanel API client: %v.", err)
 	}
 
 	if verbose {
-		apiCtx = context.WithValue(apiCtx, cpanel.LogRequestsAndResponses, true)
+		cpanelCtx = context.WithValue(cpanelCtx, cpanel.LogRequestsAndResponses, true)
 	}
 
-	// Make sure we can talk to cPanel
-	if err = testCpanel(); err != nil {
-		log.Fatalf("cPanel credentials did not work: %v. Make sure the details are correct.", err)
+	// Make sure that the cPanel account is valid and has the right features
+	if err = ensureCpanelPrereqs(); err != nil {
+		log.Fatalf("cPanel credentials did not work: %v.", err)
 		return
 	}
 }
 
-func testCpanel() error {
-	ctx, cancel := context.WithTimeout(apiCtx, 10*time.Second)
+func ensureCpanelPrereqs() error {
+	ctx, cancel := context.WithTimeout(cpanelCtx, 10*time.Second)
 	defer cancel()
-	if _, err := cpanel.DomainsData(ctx, api); err != nil {
+
+	features, err := cpanelClient.ListFeatures(ctx)
+	if err != nil {
 		return err
+	}
+
+	if !features.HasFeature("sslinstall") {
+		return errors.New("cPanel account doesn't allow the installation of " +
+			"SSL certificates, which prevents this program from working")
+	}
+	if !features.HasFeature("filemanager") {
+		return errors.New("cPanel account doesn't allow use of the file manager, " +
+			", which prevents this program from working")
 	}
 	return nil
 }
