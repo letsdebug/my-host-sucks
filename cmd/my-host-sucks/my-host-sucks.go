@@ -52,7 +52,7 @@ func main() {
 	}
 
 	if verbose {
-		apiCtx = context.WithValue(apiCtx, cpanel.LogAllResponses, true)
+		apiCtx = context.WithValue(apiCtx, cpanel.LogRequestsAndResponses, true)
 	}
 
 	// Make sure we can talk to cPanel

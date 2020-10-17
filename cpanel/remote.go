@@ -90,6 +90,10 @@ func (c *remoteCpanel) api(ctx context.Context, apiVersion, module, function str
 		c.cl = http.DefaultClient
 	}
 
+	if ctx.Value(LogRequestsAndResponses) != nil {
+		log.Printf("%s:%s:%s request: %s", apiVersion, module, function, reqURL.String())
+	}
+
 	resp, err := c.cl.Do(req)
 	if err != nil {
 		return fmt.Errorf("API request %s:%s failed: %w", module, function, err)
@@ -103,7 +107,7 @@ func (c *remoteCpanel) api(ctx context.Context, apiVersion, module, function str
 		return fmt.Errorf("failed to read full API response: %w", err)
 	}
 
-	if logResponses, ok := ctx.Value(LogAllResponses).(bool); ok && logResponses {
+	if ctx.Value(LogRequestsAndResponses) != nil {
 		log.Printf("%s:%s:%s response: %q", apiVersion, module, function, buf)
 	}
 

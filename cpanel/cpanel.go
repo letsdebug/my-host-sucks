@@ -12,8 +12,9 @@ import (
 type ContextKey int
 
 const (
-	// LogAllResponses logs all responses from the JSON server to the terminal
-	LogAllResponses ContextKey = iota
+	// LogRequestsAndResponses logs all requests and responses from the
+	// cPanel API to the terminal
+	LogRequestsAndResponses ContextKey = iota
 )
 
 // Args is a map container for arguments to the cPanel APIs

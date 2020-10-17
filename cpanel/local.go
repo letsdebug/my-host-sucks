@@ -35,12 +35,16 @@ func (c *localCpanel) execAndUnmarshal(ctx context.Context, binary, module, func
 		encodedArgs = append(encodedArgs, k+"="+url.QueryEscape(fmt.Sprintf("%v", v)))
 	}
 
+	if ctx.Value(LogRequestsAndResponses) != nil {
+		log.Printf("%s:%s:%s request: %v", binary, module, function, encodedArgs)
+	}
+
 	buf, err := exec.CommandContext(ctx, binary, encodedArgs...).Output()
 	if err != nil {
 		return fmt.Errorf("%s:%s failed: %q", module, function, buf)
 	}
 
-	if logResponses, ok := ctx.Value(LogAllResponses).(bool); ok && logResponses {
+	if ctx.Value(LogRequestsAndResponses) != nil {
 		log.Printf("%s:%s:%s response: %q", binary, module, function, buf)
 	}
 
