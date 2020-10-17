@@ -23,50 +23,46 @@ import (
 	"github.com/letsdebug/my-host-sucks/cpanel"
 )
 
-var state struct {
-	CpanelURL      string
-	CpanelUsername string
-	CpanelPassword string
-	CpanelInsecure bool
-
+var (
 	api cpanel.API
-}
+)
 
 func main() {
 	// Collect credentials if required
-	flag.StringVar(&state.CpanelURL, "cpanel-url", "", "The URL you use to access cPanel")
-	flag.StringVar(&state.CpanelUsername, "cpanel-username", "", "The URL you use to access cPanel")
-	flag.StringVar(&state.CpanelPassword, "cpanel-password", "", "The URL you use to access cPanel")
-	flag.BoolVar(&state.CpanelInsecure, "cpanel-insecure", false, "Whether the cPanel URL needs to be accessed inscurely")
+	var (
+		cpURL, cpUser, cpPassword string
+		cpInsecure                bool
+		err                       error
+	)
+	flag.StringVar(&cpURL, "cpanel-url", "", "The URL you use to access cPanel")
+	flag.StringVar(&cpUser, "cpanel-username", "", "The username you use to access cPanel")
+	flag.StringVar(&cpPassword, "cpanel-password", "", "The password you use to access cPanel")
+	flag.BoolVar(&cpInsecure, "cpanel-insecure", false, "Whether the cPanel URL needs to be accessed insecurely")
 	flag.Parse()
 
 	// Choose cPanel API client based on environment
 	if cpanel.IsLocal() {
-		state.api = cpanel.NewLocalAPI()
-	} else {
-		api, err := cpanel.NewRemoteAPI(state.CpanelURL, state.CpanelUsername, state.CpanelPassword, makeHTTPClient())
-		if err != nil {
-			log.Fatalf("Couldn't create remote cPanel API client: %v. Make sure the details are correct.", err)
-		}
-		state.api = api
+		api = cpanel.NewLocalAPI()
+	} else if api, err = cpanel.NewRemoteAPI(cpURL, cpUser, cpPassword, makeHTTPClient(cpInsecure)); err != nil {
+		log.Fatalf("Couldn't create remote cPanel API client: %v. Make sure the details are correct.", err)
 	}
 
 	// Make sure we can talk to cPanel
-	if err := testCpanel(); err != nil {
+	if err = testCpanel(); err != nil {
 		log.Fatalf("cPanel credentials did not work: %v. Make sure the details are correct.", err)
 		return
 	}
 }
 
 func testCpanel() error {
-	if _, err := cpanel.DomainsData(state.api); err != nil {
+	if _, err := cpanel.DomainsData(api); err != nil {
 		return err
 	}
 	return nil
 }
 
-func makeHTTPClient() *http.Client {
-	if state.CpanelInsecure {
+func makeHTTPClient(insecure bool) *http.Client {
+	if insecure {
 		return &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{

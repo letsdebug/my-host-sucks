@@ -88,5 +88,5 @@ func (c *remoteCpanel) api(apiVersion, module, function string, args Args, out i
 			module, function, resp.Status)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(&out)
+	return json.NewDecoder(resp.Body).Decode(out)
 }

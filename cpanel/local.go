@@ -13,10 +13,6 @@ const (
 	api2Path = "/bin/cpapi2"
 )
 
-var (
-	_ API = &localCpanel{}
-)
-
 // IsLocal determines whether the local environment is a non-root cPanel one
 func IsLocal() bool {
 	s, _ := os.Stat(uapiPath)
@@ -46,9 +42,20 @@ func (c *localCpanel) execAndUnmarshal(binary, module, function string, args Arg
 }
 
 func (c *localCpanel) UAPI(module, function string, args Args, out interface{}) error {
-	return c.execAndUnmarshal(uapiPath, module, function, args, out)
+	var resp UAPIResult
+	if err := c.execAndUnmarshal(uapiPath, module, function, args, &resp); err != nil {
+		return err
+	}
+	return json.Unmarshal(resp.Result, out)
 }
 
 func (c *localCpanel) API2(module, function string, args Args, out interface{}) error {
-	return c.execAndUnmarshal(api2Path, module, function, args, out)
+	var resp API2Result
+	if err := c.execAndUnmarshal(api2Path, module, function, args, &resp); err != nil {
+		return err
+	}
+	if err := resp.Error(); err != nil {
+		return err
+	}
+	return json.Unmarshal(resp.Result, out)
 }
