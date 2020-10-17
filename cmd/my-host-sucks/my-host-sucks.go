@@ -15,29 +15,33 @@ package main
 //   a. Run [1b..1d] and 1f using the local cPanel UAPI.
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/letsdebug/my-host-sucks/cpanel"
 )
 
 var (
-	api cpanel.API
+	api    cpanel.API
+	apiCtx context.Context = context.Background()
 )
 
 func main() {
 	// Collect credentials if required
 	var (
 		cpURL, cpUser, cpPassword string
-		cpInsecure                bool
+		cpInsecure, verbose       bool
 		err                       error
 	)
 	flag.StringVar(&cpURL, "cpanel-url", "", "The URL you use to access cPanel")
 	flag.StringVar(&cpUser, "cpanel-username", "", "The username you use to access cPanel")
 	flag.StringVar(&cpPassword, "cpanel-password", "", "The password you use to access cPanel")
 	flag.BoolVar(&cpInsecure, "cpanel-insecure", false, "Whether the cPanel URL needs to be accessed insecurely")
+	flag.BoolVar(&verbose, "verbose", false, "Whether to be very noisy")
 	flag.Parse()
 
 	// Choose cPanel API client based on environment
@@ -45,6 +49,10 @@ func main() {
 		api = cpanel.NewLocalAPI()
 	} else if api, err = cpanel.NewRemoteAPI(cpURL, cpUser, cpPassword, makeHTTPClient(cpInsecure)); err != nil {
 		log.Fatalf("Couldn't create remote cPanel API client: %v. Make sure the details are correct.", err)
+	}
+
+	if verbose {
+		apiCtx = context.WithValue(apiCtx, cpanel.LogAllResponses, true)
 	}
 
 	// Make sure we can talk to cPanel
@@ -55,7 +63,9 @@ func main() {
 }
 
 func testCpanel() error {
-	if _, err := cpanel.DomainsData(api); err != nil {
+	ctx, cancel := context.WithTimeout(apiCtx, 10*time.Second)
+	defer cancel()
+	if _, err := cpanel.DomainsData(ctx, api); err != nil {
 		return err
 	}
 	return nil

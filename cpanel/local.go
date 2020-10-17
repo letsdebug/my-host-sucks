@@ -1,8 +1,10 @@
 package cpanel
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -27,35 +29,43 @@ func NewLocalAPI() API {
 type localCpanel struct {
 }
 
-func (c *localCpanel) execAndUnmarshal(binary, module, function string, args Args, out interface{}) error {
+func (c *localCpanel) execAndUnmarshal(ctx context.Context, binary, module, function string, args Args, out interface{}) error {
 	encodedArgs := []string{"--output=json", module, function}
 	for k, v := range args {
 		encodedArgs = append(encodedArgs, k+"="+url.QueryEscape(fmt.Sprintf("%v", v)))
 	}
 
-	buf, err := exec.Command(binary, encodedArgs...).Output()
+	buf, err := exec.CommandContext(ctx, binary, encodedArgs...).Output()
 	if err != nil {
 		return fmt.Errorf("%s:%s failed: %q", module, function, buf)
 	}
 
-	return json.Unmarshal(buf, out)
+	if logResponses, ok := ctx.Value(LogAllResponses).(bool); ok && logResponses {
+		log.Printf("%s:%s:%s response: %q", binary, module, function, buf)
+	}
+
+	return prettyJSONError(buf, json.Unmarshal(buf, out))
 }
 
-func (c *localCpanel) UAPI(module, function string, args Args, out interface{}) error {
-	var resp UAPIResult
-	if err := c.execAndUnmarshal(uapiPath, module, function, args, &resp); err != nil {
+func (c *localCpanel) UAPI(ctx context.Context, module, function string, args Args, out interface{}) error {
+	// The local UAPI responses have an extra `result` wrapper compared to the remote responses
+	var resp struct {
+		Result json.RawMessage `json:"result"`
+	}
+	if err := c.execAndUnmarshal(ctx, uapiPath, module, function, args, &resp); err != nil {
 		return err
 	}
-	return json.Unmarshal(resp.Result, out)
+	return prettyJSONError(resp.Result, json.Unmarshal(resp.Result, out))
 }
 
-func (c *localCpanel) API2(module, function string, args Args, out interface{}) error {
-	var resp API2Result
-	if err := c.execAndUnmarshal(api2Path, module, function, args, &resp); err != nil {
+func (c *localCpanel) API2(ctx context.Context, module, function string, args Args, out interface{}) error {
+	// API2 responses need to be unwrapped from the outer cpanelresult hash
+	// https://documentation.cpanel.net/display/DD/cPanel+API+2+-+Return+Data
+	var resp struct {
+		Result json.RawMessage `json:"cpanelresult"`
+	}
+	if err := c.execAndUnmarshal(ctx, api2Path, module, function, args, &resp); err != nil {
 		return err
 	}
-	if err := resp.Error(); err != nil {
-		return err
-	}
-	return json.Unmarshal(resp.Result, out)
+	return prettyJSONError(resp.Result, json.Unmarshal(resp.Result, out))
 }

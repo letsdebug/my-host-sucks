@@ -1,9 +1,12 @@
 package cpanel
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 )
@@ -34,15 +37,23 @@ type remoteCpanel struct {
 	cl *http.Client
 }
 
-func (c *remoteCpanel) UAPI(module, function string, args Args, out interface{}) error {
-	return c.api("uapi", module, function, args, out)
+func (c *remoteCpanel) UAPI(ctx context.Context, module, function string, args Args, out interface{}) error {
+	return c.api(ctx, "uapi", module, function, args, out)
 }
 
-func (c *remoteCpanel) API2(module, function string, args Args, out interface{}) error {
-	return c.api("api2", module, function, args, out)
+func (c *remoteCpanel) API2(ctx context.Context, module, function string, args Args, out interface{}) error {
+	// API2 responses need to be unwrapped from the outer cpanelresult hash
+	// https://documentation.cpanel.net/display/DD/cPanel+API+2+-+Return+Data
+	var resp struct {
+		Result json.RawMessage `json:"cpanelresult"`
+	}
+	if err := c.api(ctx, "api2", module, function, args, &resp); err != nil {
+		return err
+	}
+	return prettyJSONError(resp.Result, json.Unmarshal(resp.Result, out))
 }
 
-func (c *remoteCpanel) api(apiVersion, module, function string, args Args, out interface{}) error {
+func (c *remoteCpanel) api(ctx context.Context, apiVersion, module, function string, args Args, out interface{}) error {
 	reqArgs := url.Values{}
 	for k, v := range args {
 		reqArgs.Add(k, fmt.Sprintf("%v", v))
@@ -73,6 +84,8 @@ func (c *remoteCpanel) api(apiVersion, module, function string, args Args, out i
 	req.SetBasicAuth(c.Username, c.Password)
 	req.Header.Set("user-agent", "my-host-sucks/dev (https://github.com/letsdebug/my-host-sucks)")
 
+	req = req.WithContext(ctx)
+
 	if c.cl == nil {
 		c.cl = http.DefaultClient
 	}
@@ -83,10 +96,21 @@ func (c *remoteCpanel) api(apiVersion, module, function string, args Args, out i
 	}
 	defer resp.Body.Close()
 
+	// Buffer the full response. This costs more memory but we want to to report the contents if
+	// it's not valid JSON.
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read full API response: %w", err)
+	}
+
+	if logResponses, ok := ctx.Value(LogAllResponses).(bool); ok && logResponses {
+		log.Printf("%s:%s:%s response: %q", apiVersion, module, function, buf)
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("API request %s:%s failed: HTTP %s",
 			module, function, resp.Status)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(out)
+	return prettyJSONError(buf, json.Unmarshal(buf, out))
 }
